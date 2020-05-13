@@ -17,7 +17,7 @@ public class PinterestLayout: UICollectionViewLayout {
     /**
      Delegate.
      */
-    public var delegate: PinterestLayoutDelegate!
+    public weak var delegate: PinterestLayoutDelegate?
     /**
      Number of columns.
      */
@@ -32,6 +32,10 @@ public class PinterestLayout: UICollectionViewLayout {
     private var contentHeight: CGFloat = 0
     private var contentWidth: CGFloat {
         get {
+            guard let collectionView = collectionView else {
+                return 0
+            }
+            
             let bounds = collectionView.bounds
             let insets = collectionView.contentInset
             return bounds.width - insets.left - insets.right
@@ -51,18 +55,6 @@ public class PinterestLayout: UICollectionViewLayout {
         return PinterestLayoutAttributes.self
     }
     
-    override public var collectionView: UICollectionView {
-        return super.collectionView!
-    }
-    
-    private var numberOfSections: Int {
-        return collectionView.numberOfSections
-    }
-    
-    private func numberOfItems(inSection section: Int) -> Int {
-        return collectionView.numberOfItems(inSection: section)
-    }
-    
     /**
      Invalidates layout.
      */
@@ -74,109 +66,118 @@ public class PinterestLayout: UICollectionViewLayout {
     }
     
     override public func prepare() {
-        if cache.isEmpty {
-            let collumnWidth = contentWidth / CGFloat(numberOfColumns)
-            let cellWidth = collumnWidth - (cellPadding * 2)
+        guard cache.isEmpty else {
+            return
+        }
+        
+        guard let collectionView = collectionView else {
+            return
+        }
+        
+        let collumnWidth = contentWidth / CGFloat(numberOfColumns)
+        let cellWidth = collumnWidth - (cellPadding * 2)
+        
+        var xOffsets = [CGFloat]()
+        
+        for collumn in 0..<numberOfColumns {
+            xOffsets.append(CGFloat(collumn) * collumnWidth)
+        }
+        
+        let numberOfSections: Int = collectionView.numberOfSections
+        
+        for section in 0..<numberOfSections {
+            let numberOfItems = collectionView.numberOfItems(inSection: section)
             
-            var xOffsets = [CGFloat]()
-            
-            for collumn in 0..<numberOfColumns {
-                xOffsets.append(CGFloat(collumn) * collumnWidth)
+            if let headerSize = delegate?.collectionView?(
+                collectionView: collectionView,
+                sizeForSectionHeaderViewForSection: section
+                ) {
+                let headerX = (contentWidth - headerSize.width) / 2
+                let headerFrame = CGRect(
+                    origin: CGPoint(
+                        x: headerX,
+                        y: contentHeight
+                    ),
+                    size: headerSize
+                )
+                let headerAttributes = PinterestLayoutAttributes(
+                    forSupplementaryViewOfKind: UICollectionElementKindSectionHeader,
+                    with: IndexPath(item: 0, section: section)
+                )
+                headerAttributes.frame = headerFrame
+                cache.append(headerAttributes)
+                
+                contentHeight = headerFrame.maxY
             }
             
-            for section in 0..<numberOfSections {
-                let numberOfItems = self.numberOfItems(inSection: section)
+            var yOffsets = [CGFloat](
+                repeating: contentHeight,
+                count: numberOfColumns
+            )
+            
+            for item in 0..<numberOfItems {
+                let indexPath = IndexPath(item: item, section: section)
                 
-                if let headerSize = delegate.collectionView?(
-                    collectionView: collectionView,
-                    sizeForSectionHeaderViewForSection: section
-                    ) {
-                    let headerX = (contentWidth - headerSize.width) / 2
-                    let headerFrame = CGRect(
-                        origin: CGPoint(
-                            x: headerX,
-                            y: contentHeight
-                        ),
-                        size: headerSize
-                    )
-                    let headerAttributes = PinterestLayoutAttributes(
-                        forSupplementaryViewOfKind: UICollectionElementKindSectionHeader,
-                        with: IndexPath(item: 0, section: section)
-                    )
-                    headerAttributes.frame = headerFrame
-                    cache.append(headerAttributes)
-                    
-                    contentHeight = headerFrame.maxY
-                }
+                let column = yOffsets.index(of: yOffsets.min() ?? 0) ?? 0
                 
-                var yOffsets = [CGFloat](
-                    repeating: contentHeight,
-                    count: numberOfColumns
-                )
-                
-                for item in 0..<numberOfItems {
-                    let indexPath = IndexPath(item: item, section: section)
-                    
-                    let column = yOffsets.index(of: yOffsets.min() ?? 0) ?? 0
-                    
-                    let imageHeight = delegate.collectionView(
+                guard
+                    let imageHeight = delegate?.collectionView(
                         collectionView: collectionView,
                         heightForImageAtIndexPath: indexPath,
-                        withWidth: cellWidth
-                    )
-                    let annotationHeight = delegate.collectionView(
+                        withWidth: cellWidth),
+                    let annotationHeight = delegate?.collectionView(
                         collectionView: collectionView,
                         heightForAnnotationAtIndexPath: indexPath,
-                        withWidth: cellWidth
-                    )
-                    let cellHeight = cellPadding + imageHeight + annotationHeight + cellPadding
-                    
-                    let frame = CGRect(
-                        x: xOffsets[column],
-                        y: yOffsets[column],
-                        width: collumnWidth,
-                        height: cellHeight
-                    )
-                    
-                    let insetFrame = frame.insetBy(dx: cellPadding, dy: cellPadding)
-                    let attributes = PinterestLayoutAttributes(
-                        forCellWith: indexPath
-                    )
-                    attributes.frame = insetFrame
-                    attributes.imageHeight = imageHeight
-                    cache.append(attributes)
-                    
-                    contentHeight = max(contentHeight, frame.maxY)
-                    yOffsets[column] = yOffsets[column] + cellHeight
+                        withWidth: cellWidth) else {
+                            continue
                 }
                 
-                if let footerSize = delegate.collectionView?(
-                    collectionView: collectionView,
-                    sizeForSectionFooterViewForSection: section
-                    ) {
-                    let footerX = (contentWidth - footerSize.width) / 2
-                    let footerFrame = CGRect(
-                        origin: CGPoint(
-                            x: footerX,
-                            y: contentHeight
-                        ),
-                        size: footerSize
-                    )
-                    let footerAttributes = PinterestLayoutAttributes(
-                        forSupplementaryViewOfKind: UICollectionElementKindSectionFooter,
-                        with: IndexPath(item: 0, section: section)
-                    )
-                    footerAttributes.frame = footerFrame
-                    cache.append(footerAttributes)
-                    
-                    contentHeight = footerFrame.maxY
-                }
+                let cellHeight = cellPadding + imageHeight + annotationHeight + cellPadding
+                
+                let frame = CGRect(
+                    x: xOffsets[column],
+                    y: yOffsets[column],
+                    width: collumnWidth,
+                    height: cellHeight
+                )
+                
+                let insetFrame = frame.insetBy(dx: cellPadding, dy: cellPadding)
+                let attributes = PinterestLayoutAttributes(
+                    forCellWith: indexPath
+                )
+                attributes.frame = insetFrame
+                attributes.imageHeight = imageHeight
+                cache.append(attributes)
+                
+                contentHeight = max(contentHeight, frame.maxY)
+                yOffsets[column] = yOffsets[column] + cellHeight
+            }
+            
+            if let footerSize = delegate?.collectionView?(
+                collectionView: collectionView,
+                sizeForSectionFooterViewForSection: section
+                ) {
+                let footerX = (contentWidth - footerSize.width) / 2
+                let footerFrame = CGRect(
+                    origin: CGPoint(
+                        x: footerX,
+                        y: contentHeight
+                    ),
+                    size: footerSize
+                )
+                let footerAttributes = PinterestLayoutAttributes(
+                    forSupplementaryViewOfKind: UICollectionElementKindSectionFooter,
+                    with: IndexPath(item: 0, section: section)
+                )
+                footerAttributes.frame = footerFrame
+                cache.append(footerAttributes)
+                
+                contentHeight = footerFrame.maxY
             }
         }
     }
     
     override public func layoutAttributesForElements(in rect: CGRect) -> [UICollectionViewLayoutAttributes]? {
-        
         var layoutAttributes = [UICollectionViewLayoutAttributes]()
         
         for attributes in cache {
@@ -187,4 +188,5 @@ public class PinterestLayout: UICollectionViewLayout {
         
         return layoutAttributes
     }
+    
 }
