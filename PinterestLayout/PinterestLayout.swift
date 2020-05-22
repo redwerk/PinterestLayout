@@ -101,7 +101,7 @@ public class PinterestLayout: UICollectionViewLayout {
                     size: headerSize
                 )
                 let headerAttributes = PinterestLayoutAttributes(
-                    forSupplementaryViewOfKind: UICollectionElementKindSectionHeader,
+                    forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader,
                     with: IndexPath(item: 0, section: section)
                 )
                 headerAttributes.frame = headerFrame
@@ -118,7 +118,7 @@ public class PinterestLayout: UICollectionViewLayout {
             for item in 0..<numberOfItems {
                 let indexPath = IndexPath(item: item, section: section)
                 
-                let column = yOffsets.index(of: yOffsets.min() ?? 0) ?? 0
+                let column = yOffsets.firstIndex(of: yOffsets.min() ?? 0) ?? 0
                 
                 guard
                     let imageHeight = delegate?.collectionView(
@@ -166,7 +166,7 @@ public class PinterestLayout: UICollectionViewLayout {
                     size: footerSize
                 )
                 let footerAttributes = PinterestLayoutAttributes(
-                    forSupplementaryViewOfKind: UICollectionElementKindSectionFooter,
+                    forSupplementaryViewOfKind: UICollectionView.elementKindSectionFooter,
                     with: IndexPath(item: 0, section: section)
                 )
                 footerAttributes.frame = footerFrame
